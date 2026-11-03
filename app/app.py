@@ -15,7 +15,7 @@ class RDRInteractiveCLI:
         print("  Mendukung: Biner/Boolean, Numerikal, & Prinsip OWA")
         print("=" * 65)
 
-        # 1. Pilih preset dataset (Hanya 2 pilihan)
+        # 1. Pilih preset dataset (No 1: Telco, No 2: Loan)
         config = self._choose_dataset_profile()
         self.dataset_config = config
 
@@ -26,30 +26,32 @@ class RDRInteractiveCLI:
 
     def _choose_dataset_profile(self) -> Dict[str, Any]:
         """
-        Menyediakan opsi pemilihan dataset (hanya dibatasi pada 2 dataset utama).
+        Menyediakan opsi pemilihan dataset:
+        1 = Telco Churn (True-False)
+        2 = Loan Approval (Numerikal)
         """
         print("\nPILIH DOMAIN DATASET KASUS:")
-        print("1. Loan Approval Dataset (Finansial / Kredit)")
-        print("2. Telco Customer Churn Dataset (Retensi Konsumen)")
+        print("1. Telco Customer Churn Dataset (True-False / Boolean)")
+        print("2. Loan Approval Dataset (Numerikal)")
         print("-" * 50)
 
         while True:
             choice = input("Pilih dataset (1 atau 2): ").strip()
             if choice == "1":
                 return {
-                    "name": "Loan Approval",
-                    "file_path": "data/processed/loan_approval_clean.csv",
-                    "raw_fallback": "data/raw/loan_approval_dataset.csv",
-                    "target_column": "loan_status",
-                    "default_root": "Rejected"
-                }
-            elif choice == "2":
-                return {
-                    "name": "Telco Customer Churn",
+                    "name": "Telco Customer Churn (True-False)",
                     "file_path": "data/processed/telco_churn_clean.csv",
                     "raw_fallback": "data/raw/WA_Fn-UseC_-Telco-Customer-Churn.csv",
                     "target_column": "Churn",
                     "default_root": "No"
+                }
+            elif choice == "2":
+                return {
+                    "name": "Loan Approval (Numerikal)",
+                    "file_path": "data/processed/loan_approval_clean.csv",
+                    "raw_fallback": "data/raw/loan_approval_dataset.csv",
+                    "target_column": "loan_status",
+                    "default_root": "Rejected"
                 }
             else:
                 print("[!] Pilihan tidak valid. Silakan masukkan angka 1 atau 2.")
@@ -61,7 +63,7 @@ class RDRInteractiveCLI:
             print("1. Jalankan Simulasi Kasus dari Dataset")
             print("2. Input Kasus Konsumen Manual")
             print("3. Uji Ulang Basis Pengetahuan (Knowledge Retest)")
-            print("4. Ganti Dataset (Loan Approval / Telco Churn)")
+            print("4. Ganti Dataset (Telco Churn / Loan Approval)")
             print("5. Keluar")
             print("-" * 50)
 
@@ -88,15 +90,14 @@ class RDRInteractiveCLI:
         Membaca dataset baris per baris dan menyimulasikannya ke antarmuka pakar.
         """
         file_path = self.dataset_config["file_path"]
-        
-        # Cek ketersediaan file processed, fallback ke raw jika processed belum di-generate
+
         if not os.path.exists(file_path):
             fallback = self.dataset_config.get("raw_fallback")
             if fallback and os.path.exists(fallback):
                 file_path = fallback
             else:
                 print(f"[!] File dataset tidak ditemukan di '{file_path}' maupun '{fallback}'.")
-                print("    Pastikan file CSV mentah sudah dimasukkan ke folder 'data/raw/'.")
+                print("    Jalankan skrip 'py -m src.utils.preprocess' terlebih dahulu.")
                 return
 
         try:
@@ -119,7 +120,8 @@ class RDRInteractiveCLI:
 
     def _input_case_manual(self) -> Case:
         print("\n--- INPUT KASUS KONSUMEN MANUAL (Format: key=value) ---")
-        print("Contoh: education=True, cibil_score=750, loan_amount=10000000")
+        print("Contoh Boolean  : SeniorCitizen=True, Partner=False, PaperlessBilling=True")
+        print("Contoh Numerik  : cibil_score=750, loan_amount=10000000")
         print("(Atribut yang tidak dituliskan dianggap TIDAK DIKETAHUI sesuai prinsip OWA)")
         
         raw_in = input("Data kasus (pisahkan koma): ").strip()
@@ -149,11 +151,11 @@ class RDRInteractiveCLI:
 
     def _process_case_interaction(self, case: Case, ground_truth: Optional[str] = None):
         """
-        Alur inti interaksi RDR:
+        Alur interaksi RDR:
         1. Inferensi pohon saat ini.
-        2. Tampilkan rekomendasi sistem dan ground truth (jika ada).
+        2. Tampilkan kesimpulan sistem dan ground truth.
         3. Konfirmasi pakar (Setuju / Tidak).
-        4. Jika tidak setuju, ekstrak kandidat pembeda vs cornerstone case.
+        4. Jika tidak setuju, tampilkan variabel pembeda vs cornerstone case.
         5. Bentuk cabang baru (kanan atau kiri).
         """
         print("\nDATA KONSUMEN:")
@@ -162,21 +164,18 @@ class RDRInteractiveCLI:
         if ground_truth is not None:
             print(f"  * [Ground Truth Label]: {ground_truth}")
 
-        # Inferensi kasus melalui penelusuran tree
         inference_ctx = self.rdr.infer(case)
         system_conclusion = inference_ctx["conclusion"]
         last_satisfied = inference_ctx["last_satisfied_node"]
 
         print(f"\n--> [REKOMENDASI SISTEM]: {system_conclusion} (Node {last_satisfied.node_id})")
 
-        # Keputusan Pakar
         agreement = input("Apakah Anda sebagai Pakar SETUJU dengan rekomendasi ini? (y/n): ").strip().lower()
 
         if agreement in {"y", "yes"}:
             print("[✓] Rekomendasi disetujui. Tree tidak diubah.")
             return
 
-        # Pakar menolak -> Tambah rule perkecualian baru
         print("\n[!] Pakar tidak setuju. Menyiapkan aturan perkecualian baru...")
         suggested_label = ground_truth if ground_truth else ""
         prompt_label = f"Masukkan Rekomendasi Baru Pakar [{suggested_label}]: " if suggested_label else "Masukkan Rekomendasi Baru Pakar: "
@@ -184,7 +183,6 @@ class RDRInteractiveCLI:
         if not new_conclusion and suggested_label:
             new_conclusion = suggested_label
 
-        # Ekstraksi variabel pembeda dengan cornerstone case dari node yang hendak dianulir
         cornerstone = last_satisfied.cornerstone_case
         candidates = DifferenceExtractor.extract_candidates(case, cornerstone)
 
@@ -214,7 +212,6 @@ class RDRInteractiveCLI:
                 print("[i] Tidak ada nomor yang dipilih. Mengambil kandidat pertama secara default.")
                 selected_conditions = [candidates[0]]
 
-        # Menambahkan rule baru ke tree
         new_node = self.rdr.add_rule(
             inference_context=inference_ctx,
             conditions=selected_conditions,
@@ -227,9 +224,6 @@ class RDRInteractiveCLI:
         print(f"         IF {' AND '.join(str(c) for c in selected_conditions)} THEN '{new_conclusion}'")
 
     def _show_validation_report(self):
-        """
-        Menjalankan pengujian ulang (re-test) terhadap seluruh kasus pembentuk rule.
-        """
         print("\n" + "=" * 65)
         print("  LAPORAN PENGUJIAN ULANG KNOWLEDGE BASE (KNOWLEDGE RETEST)")
         print("=" * 65)
