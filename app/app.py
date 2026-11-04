@@ -63,11 +63,12 @@ class RDRInteractiveCLI:
             print("1. Jalankan Simulasi Kasus dari Dataset")
             print("2. Input Kasus Konsumen Manual")
             print("3. Uji Ulang Basis Pengetahuan (Knowledge Retest)")
-            print("4. Ganti Dataset (Telco Churn / Loan Approval)")
-            print("5. Keluar")
+            print("4. Tampilkan Struktur Pohon Keputusan (Tree View)")
+            print("5. Ganti Dataset (Telco Churn / Loan Approval)")
+            print("6. Keluar")
             print("-" * 50)
 
-            menu = input("Pilih menu (1-5): ").strip()
+            menu = input("Pilih menu (1-6): ").strip()
 
             if menu == "1":
                 self._run_dataset_simulation()
@@ -78,16 +79,35 @@ class RDRInteractiveCLI:
             elif menu == "3":
                 self._show_validation_report()
             elif menu == "4":
-                self.__init__()
+                self._show_tree_structure()
             elif menu == "5":
+                self.__init__()
+            elif menu == "6":
                 print("\nTerima kasih telah menggunakan sistem pakar RDR.")
                 sys.exit(0)
             else:
-                print("[!] Pilihan tidak dikenali. Masukkan angka 1-5.")
+                print("[!] Pilihan tidak dikenali. Masukkan angka 1-6.")
+
+    def _show_tree_structure(self):
+        print("\n" + "=" * 65)
+        print("         STRUKTUR POHON KEPUTUSAN RDR SAAT INI")
+        print("=" * 65)
+        print(self.rdr.get_tree_text())
+        print("=" * 65)
+
+        export_dot = input("\nSimpan kode diagram Graphviz (.dot) untuk laporan? (y/n): ").strip().lower()
+        if export_dot in {"y", "yes"}:
+            dot_code = self.rdr.export_graphviz_dot()
+            filename = f"rdr_tree_{self.dataset_config['name'].lower().replace(' ', '_')}.dot"
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(dot_code)
+            print(f"[OK] Berkas DOT berhasil disimpan sebagai '{filename}'.")
+            print("     Anda dapat memvisualisasikannya di https://dreampuf.github.io/GraphvizOnline")
 
     def _run_dataset_simulation(self):
         """
         Membaca dataset baris per baris dan menyimulasikannya ke antarmuka pakar.
+        Menyediakan opsi pembatasan jumlah kasus (misal: 10 kasus) untuk pengujian pohon.
         """
         file_path = self.dataset_config["file_path"]
 
@@ -105,18 +125,42 @@ class RDRInteractiveCLI:
                 file_path, 
                 target_column=self.dataset_config["target_column"]
             )
-            print(f"\n[OK] Berhasil memuat {len(records)} baris data dari '{file_path}'.")
+            total_records = len(records)
+            print(f"\n[OK] Berhasil memuat total {total_records} baris data dari '{file_path}'.")
         except Exception as e:
             print(f"[!] Gagal memuat dataset: {e}")
             return
 
-        for idx, (case, ground_truth) in enumerate(records, start=1):
-            print(f"\n==================== KASUS KE-{idx} DARI {len(records)} ====================")
+        # --- OPSI PEMBATASAN KASUS (PENGUJIAN CEPAT) ---
+        print("\nPENGATURAN KASUS UNTUK PENGUJIAN POHON:")
+        print("1. Jalankan 10 Kasus Pertama Saja (Sangat Direkomendasikan untuk Verifikasi)")
+        print("2. Tentukan Jumlah Kasus Sendiri (Kustom)")
+        print("3. Jalankan Seluruh Data")
+        opt = input("Pilihan opsi (1/2/3) [Default 1]: ").strip()
+
+        if opt == "2":
+            custom_n = input("Masukkan jumlah kasus yang ingin diuji (misal: 5 atau 20): ").strip()
+            limit = int(custom_n) if custom_n.isdigit() and int(custom_n) > 0 else 10
+        elif opt == "3":
+            limit = total_records
+        else:
+            limit = min(10, total_records)  # Default 10 kasus
+
+        records_to_run = records[:limit]
+        print(f"\n[INFO] Menjalankan simulasi untuk {len(records_to_run)} kasus terpilih...\n")
+
+        for idx, (case, ground_truth) in enumerate(records_to_run, start=1):
+            print(f"\n==================== KASUS KE-{idx} DARI {len(records_to_run)} ====================")
             self._process_case_interaction(case, ground_truth)
 
-            nav = input("\nLanjut ke kasus berikutnya? (y = ya / n = kembali ke menu): ").strip().lower()
-            if nav not in {"y", "yes"}:
-                break
+            # Jika belum kasus terakhir, tanyakan apakah ingin lanjut
+            if idx < len(records_to_run):
+                nav = input("\nLanjut ke kasus berikutnya? (y = ya / n = kembali ke menu): ").strip().lower()
+                if nav not in {"y", "yes"}:
+                    print("\n[i] Simulasi dihentikan. Struktur pohon saat ini tetap tersimpan.")
+                    break
+            else:
+                print(f"\n[✓] Seluruh {len(records_to_run)} kasus pengujian telah selesai dievaluasi.")
 
     def _input_case_manual(self) -> Case:
         print("\n--- INPUT KASUS KONSUMEN MANUAL (Format: key=value) ---")

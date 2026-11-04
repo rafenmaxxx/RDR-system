@@ -23,43 +23,48 @@ class DifferenceExtractor:
         """
         candidates: List[Condition] = []
 
-        # Kasus instance pertama (dibandingkan dengan nothing / None)
+        # 1. Kasus pertama (dibandingkan dengan None / nothing)
         if cornerstone_case is None:
             for attr, val in new_case.items():
                 if val is not None:
-                    candidates.append(Condition(attribute=attr, operator="==", value=val))
+                    if isinstance(val, bool):
+                        candidates.append(Condition(attr, "==", val))
+                    elif isinstance(val, (int, float)) and not isinstance(val, bool):
+                        candidates.append(Condition(attr, ">=", val))
+                    else:
+                        candidates.append(Condition(attr, "==", val))
             return candidates
 
-        # Kasus kedua dan seterusnya (dibandingkan dengan cornerstone case yang hendak dianulir)
-        for attr, new_val in new_case.items():
-            if new_val is None:
+        # 2. Kasus berikutnya (dibandingkan dengan cornerstone case)
+        for attr, val_new in new_case.items():
+            if val_new is None:
                 continue
 
-            ref_val = cornerstone_case.get(attr)
-
-            # Kondisi A: Atribut ada di new_case tetapi tidak ada di cornerstone (OWA: unknown di ref)
-            if ref_val is None:
-                if isinstance(new_val, bool):
-                    candidates.append(Condition(attribute=attr, operator="==", value=new_val))
-                elif isinstance(new_val, (int, float)):
-                    # Atribut numerik baru yang tidak ada pada kasus acuan
-                    candidates.append(Condition(attribute=attr, operator="==", value=new_val))
-                else:
-                    candidates.append(Condition(attribute=attr, operator="==", value=new_val))
+            # Prinsip OWA: Atribut ada di kasus baru tapi tidak ada di cornerstone
+            if attr not in cornerstone_case or cornerstone_case[attr] is None:
+                candidates.append(Condition(attr, "==", val_new))
                 continue
 
-            # Kondisi B: Atribut ada di kedua kasus namun nilainya berbeda
-            if new_val != ref_val:
-                # Penanganan khusus fitur numerikal
-                if isinstance(new_val, (int, float)) and isinstance(ref_val, (int, float)):
-                    if new_val > ref_val:
-                        # Nilai kasus baru lebih tinggi: jadikan ambang batas bawah
-                        candidates.append(Condition(attribute=attr, operator=">", value=ref_val))
-                    else:
-                        # Nilai kasus baru lebih rendah: jadikan ambang batas atas
-                        candidates.append(Condition(attribute=attr, operator="<=", value=ref_val))
+            val_cs = cornerstone_case[attr]
+
+            # Jika nilainya sama persis, bukan pembeda
+            if val_new == val_cs:
+                continue
+
+            # --- PERBAIKAN DI SINI ---
+            # A. Tangani BOOLEAN secara eksplisit terlebih dahulu
+            if isinstance(val_new, bool) or isinstance(val_cs, bool):
+                candidates.append(Condition(attr, "==", val_new))
+
+            # B. Tangani NUMERIK (khusus angka murni, bukan bool)
+            elif isinstance(val_new, (int, float)) and isinstance(val_cs, (int, float)):
+                if float(val_new) > float(val_cs):
+                    candidates.append(Condition(attr, ">", val_cs))
                 else:
-                    # Penanganan biner / boolean / kategorikal
-                    candidates.append(Condition(attribute=attr, operator="==", value=new_val))
+                    candidates.append(Condition(attr, "<=", val_cs))
+
+            # C. Tangani KATEGORIAL / STRING
+            else:
+                candidates.append(Condition(attr, "==", val_new))
 
         return candidates

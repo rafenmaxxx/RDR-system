@@ -95,3 +95,67 @@ class RippleDownRulesSystem:
         # Catat ke registry kasus kunci
         self.cornerstone_registry.append((new_node.node_id, new_case, new_conclusion))
         return new_node
+
+    def get_tree_text(self, node: Optional[RDRNode] = None, prefix: str = "", branch_type: Optional[str] = None) -> str:
+        """
+        Menghasilkan representasi pohon keputusan dalam bentuk teks berjenjang (ASCII Tree).
+        """
+        if node is None:
+            if prefix == "" and branch_type is None:
+                node = self.root
+            else:
+                return ""
+
+        cond_str = " AND ".join(str(c) for c in node.conditions) if node.conditions else "True (Default)"
+        
+        if branch_type == "TRUE":
+            branch_label = "──[TRUE / Exception]──> "
+        elif branch_type == "FALSE":
+            branch_label = "──[FALSE / Alternatif]─> "
+        else:
+            branch_label = "[ROOT] "
+
+        lines = [f"{prefix}{branch_label}Node {node.node_id}: IF {cond_str} THEN '{node.conclusion}'"]
+
+        child_prefix = prefix + ("    " if branch_type is not None else "")
+        if node.true_child:
+            lines.append(self.get_tree_text(node.true_child, child_prefix + "│   ", "TRUE"))
+        if node.false_child:
+            lines.append(self.get_tree_text(node.false_child, child_prefix + "    ", "FALSE"))
+
+        return "\n".join(lines)
+
+    def export_graphviz_dot(self) -> str:
+        """
+        Mengekspor struktur pohon ke format Graphviz (DOT) agar dapat dirender menjadi gambar diagram.
+        """
+        lines = [
+            "digraph RDRTree {",
+            '  node [shape=box, style="rounded,filled", fillcolor="#E8F0FE", fontname="Helvetica"];',
+            '  edge [fontname="Helvetica", fontsize=10];'
+        ]
+
+        def traverse(curr: Optional[RDRNode]):
+            if curr is None:
+                return
+            cond_str = "\\nAND ".join(str(c) for c in curr.conditions) if curr.conditions else "True (Root)"
+            label = f"Node {curr.node_id}\\nIF {cond_str}\\nTHEN '{curr.conclusion}'"
+            lines.append(f'  node_{curr.node_id} [label="{label}"];')
+
+            if curr.true_child:
+                lines.append(
+                    f'  node_{curr.node_id} -> node_{curr.true_child.node_id} '
+                    f'[label="True (Exception)", color="#2E7D32", fontcolor="#2E7D32", penwidth=1.5];'
+                )
+                traverse(curr.true_child)
+
+            if curr.false_child:
+                lines.append(
+                    f'  node_{curr.node_id} -> node_{curr.false_child.node_id} '
+                    f'[label="False (Alternative)", color="#C62828", fontcolor="#C62828", style=dashed];'
+                )
+                traverse(curr.false_child)
+
+        traverse(self.root)
+        lines.append("}")
+        return "\n".join(lines)
