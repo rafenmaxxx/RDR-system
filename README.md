@@ -9,11 +9,7 @@ Sistem pakar berbasis **Ripple Down Rules (RDR)** interaktif yang dirancang untu
   - **Anak Kiri (*false-child*)**: Cabang alternatif saat kondisi tidak terpenuhi (mempertahankan kesimpulan valid sebelumnya).
 - **Inference with Rule Override**: Kesimpulan akhir sistem adalah kesimpulan terakhir yang bernilai `True` sepanjang jalur evaluasi.
 - **Open World Assumption (OWA)**: Ketiadaan atribut pada data konsumen dianggap *unknown* (bukan diasumsikan `False` / `Not`).
-- **Difference Matrix**: Menampilkan variabel pembeda signifikan antara kasus baru dengan *cornerstone case* dari rule yang hendak dianulir.
-- **Knowledge Base Retesting**: Pengujian ulang seluruh kasus acuan (*cornerstone cases*) ke pohon aturan untuk memantau konsistensi basis pengetahuan.
-- **Dukungan 2 Dataset**:
-  1. *Loan Approval Dataset* (Domain Finansial / Kredit)
-  2. *Telco Customer Churn Dataset* (Domain Retensi Konsumen)
+- **Visualisasi Pohon Keputusan & Ekspor Graphviz (.dot)**: Menampilkan struktur hierarki pohon secara teks berjenjang (ASCII Tree) di CLI serta ekspor diagram format `.dot` untuk visualisasi grafis.
 
 ---
 
@@ -22,19 +18,19 @@ Sistem pakar berbasis **Ripple Down Rules (RDR)** interaktif yang dirancang untu
 ```text
 rdr-expert-system/
 ├── data/
-│   ├── raw/                  # Tempat file dataset CSV mentah
+│   ├── raw/                                        # Tempat file dataset CSV mentah
 │   │   ├── loan_approval_dataset.csv
 │   │   └── WA_Fn-UseC_-Telco-Customer-Churn.csv
-│   └── processed/            # Hasil pembersihan data (terbentuk otomatis)
+│   └── processed/                                  # Hasil pembersihan data (terbentuk otomatis)
 │       ├── loan_approval_clean.csv
 │       └── telco_churn_clean.csv
 ├── src/
-│   ├── core/                 # Condition, RDRNode, dan RDRTree
-│   ├── expert/               # Ekstraksi pembeda & validator retest
-│   └── utils/                # Preprocessing & loader dataset
+│   ├── core/                                       # Condition, RDRNode, dan RDRTree
+│   ├── expert/                                     # Ekstraksi pembeda & validator retest
+│   └── utils/                                      # Preprocessing & loader dataset
 ├── app/
-│   └── app.py                # Antarmuka CLI interaktif
-├── tests/                    # Unit testing (OWA, inferensi, knowledge update)
+│   └── app.py                                      # Antarmuka CLI interaktif
+├── tests/                                          # Unit testing (OWA, inferensi, knowledge update)
 ├── requirements.txt
 └── README.md
 
@@ -96,16 +92,16 @@ Saat aplikasi pertama kali dijalankan, Anda akan diminta memilih salah satu dari
 
 ### 2. Navigasi Menu Utama
 
-Setelah memilih domain, sistem menampilkan 5 opsi menu:
+Setelah memilih domain, sistem menampilkan 6 opsi menu:
 
 ```text
 MENU UTAMA:
-1. Jalankan Simulasi Kasus dari Dataset
+1. Jalankan Simulasi Kasus dari Dataset (mendukung opsi 10 kasus pertama / kustom)
 2. Input Kasus Konsumen Manual
 3. Uji Ulang Basis Pengetahuan (Knowledge Retest)
-4. Ganti Dataset (Telco Churn / Loan Approval)
-5. Keluar
-
+4. Tampilkan Struktur Pohon Keputusan (Tree View & Simpan .dot)
+5. Ganti Dataset (Telco Churn / Loan Approval)
+6. Keluar
 ```
 
 ---
@@ -135,10 +131,6 @@ Setiap kali data konsumen dievaluasi oleh sistem, alur interaksi pakar berjalan 
 * **Anak Kanan (*true-child*)**: Jika kondisi aturan sebelumnya terpenuhi (perkecualian/spesialisasi).
 * **Anak Kiri (*false-child*)**: Jika kondisi aturan sebelumnya gagal/tidak terpenuhi (alternatif).
 
-
-
-
-
 ---
 
 ### 4. Input Kasus Konsumen Manual (Menu 2)
@@ -157,3 +149,11 @@ Digunakan kapan saja untuk memverifikasi kestabilan pohon keputusan:
 
 * Menguji kembali seluruh *cornerstone cases* yang tersimpan ke dalam struktur pohon terbaru.
 * Menampilkan ringkasan jumlah kasus yang konsisten, kasus yang mengalami perubahan output (*side effect*), serta persentase konsistensi aturan.
+
+---
+
+### 6. Tampilkan & Ekspor Struktur Pohon (Menu 4)
+
+Menu ini menampilkan diagram alir aturan RDR terkini:
+* **Tampilan Terminal**: Menampilkan relasi cabang anak kanan (`──[TRUE / Exception]──>`) dan anak kiri (`──[FALSE / Alternatif]─>`) secara berjenjang.
+* **Simpan File Graphviz (`.dot`)**: Menghasilkan berkas skrip diagram grafis yang dapat langsung dibuka atau diunggah ke visualizer Graphviz (seperti [GraphvizOnline](https://dreampuf.github.io/GraphvizOnline)) untuk kebutuhan laporan.
